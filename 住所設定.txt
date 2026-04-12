@@ -1,0 +1,2 @@
+住所設定
+cd "C:\Users\chiaki\Desktop\ai-sns-team"

@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "posts": [
+    {
+      "id": "example-001",
+      "scheduled_at": "2026-04-12T21:30:00+09:00",
+      "status": "pending",
+      "text": "ここに投稿本文（500字以内）",
+      "attempts": 0,
+      "threads_post_id": null,
+      "last_error": null,
+      "posted_at": null,
+      "updated_at": null
+    }
+  ]
+}

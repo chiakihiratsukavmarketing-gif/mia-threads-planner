@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#111827" />
+    <link rel="manifest" href="/manifest.json" />
+    <title>Threads Planner</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --card: #ffffff;
+        --text: #111827;
+        --muted: #6b7280;
+        --line: #e5e7eb;
+        --blue: #2563eb;
+        --green: #16a34a;
+      }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji",
+          "Segoe UI Emoji";
+        background: var(--bg);
+        color: var(--text);
+      }
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: #111827;
+        color: #fff;
+        padding: 14px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      header .title {
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+      header .sub {
+        font-size: 12px;
+        opacity: 0.85;
+        margin-top: 2px;
+      }
+      main {
+        padding: 14px 14px 96px;
+        max-width: 980px;
+        margin: 0 auto;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        justify-content: space-between;
+        margin: 12px 0 14px;
+      }
+      .btn {
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--text);
+        padding: 10px 12px;
+        border-radius: 10px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .btn.primary {
+        border-color: #1d4ed8;
+        background: var(--blue);
+        color: #fff;
+      }
+      .btn:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+      .hint {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 12px;
+        margin: 10px 0;
+        box-shadow: 0 10px 30px rgba(17, 24, 39, 0.06);
+      }
+      .row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .badge {
+        font-size: 12px;
+        font-weight: 800;
+        padding: 4px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+      }
+      .badge.scheduled {
+        color: #1d4ed8;
+        border-color: #bfdbfe;
+        background: #eff6ff;
+      }
+      .badge.posted {
+        color: #166534;
+        border-color: #bbf7d0;
+        background: #f0fdf4;
+      }
+      .badge.failed {
+        color: #991b1b;
+        border-color: #fecaca;
+        background: #fef2f2;
+      }
+      .time {
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+      }
+      textarea {
+        width: 100%;
+        min-height: 92px;
+        resize: vertical;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        padding: 10px;
+        font-size: 14px;
+        line-height: 1.5;
+        box-sizing: border-box;
+      }
+      .meta {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      @media (min-width: 860px) {
+        .meta {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      label {
+        font-size: 12px;
+        color: var(--muted);
+        display: block;
+        margin-bottom: 6px;
+        font-weight: 700;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        padding: 10px;
+        font-size: 14px;
+      }
+      .fab {
+        position: fixed;
+        right: 16px;
+        bottom: 16px;
+        width: 54px;
+        height: 54px;
+        border-radius: 999px;
+        border: none;
+        background: #111827;
+        color: #fff;
+        font-size: 28px;
+        line-height: 0;
+        cursor: pointer;
+        box-shadow: 0 18px 40px rgba(17, 24, 39, 0.25);
+      }
+      pre.err {
+        white-space: pre-wrap;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #991b1b;
+        padding: 10px;
+        border-radius: 12px;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <div class="title">Threads Planner</div>
+        <div class="sub" id="dayLabel">—</div>
+      </div>
+      <button class="btn" id="btnToday" type="button">Today</button>
+    </header>
+
+    <main>
+      <div class="toolbar">
+        <div>
+          <button class="btn" id="btnPrev" type="button">←</button>
+          <button class="btn" id="btnNext" type="button">→</button>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center">
+          <button class="btn" id="btnReload" type="button">再読込</button>
+          <button class="btn primary" id="btnSave" type="button" disabled>保存（GitHubへcommit）</button>
+        </div>
+      </div>
+      <div class="hint">
+        予約の実行は GitHub Actions（±5分＋遅延救済）側です。ここは <code>queue/posts.json</code> の編集UIです。
+      </div>
+      <div id="errorBox" style="display: none; margin-top: 12px"></div>
+      <div id="list"></div>
+    </main>
+
+    <button class="fab" id="btnAdd" type="button" title="追加">+</button>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+
+      /** @type {{version:number, posts:any[]} | null} */
+      let state = null;
+      let dirty = false;
+      /** @type {string} YYYY-MM-DD (local) */
+      let day = new Date().toISOString().slice(0, 10);
+
+      function setError(msg) {
+        const box = $("errorBox");
+        if (!msg) {
+          box.style.display = "none";
+          box.textContent = "";
+          return;
+        }
+        box.style.display = "block";
+        box.innerHTML = `<pre class="err"></pre>`;
+        box.querySelector("pre").textContent = msg;
+      }
+
+      function pad2(n) {
+        return String(n).padStart(2, "0");
+      }
+
+      function localDateLabel(ymd) {
+        const [y, m, d] = ymd.split("-").map((x) => parseInt(x, 10));
+        const dt = new Date(y, m - 1, d);
+        const w = ["日", "月", "火", "水", "木", "金", "土"][dt.getDay()];
+        return `${y}/${m}/${d}（${w}）`;
+      }
+
+      function bumpDay(delta) {
+        const [y, m, d] = day.split("-").map((x) => parseInt(x, 10));
+        const dt = new Date(y, m - 1, d + delta);
+        day = `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+        $("dayLabel").textContent = `${localDateLabel(day)} · LOCAL`;
+        void render();
+      }
+
+      function statusBadge(status) {
+        const s = String(status || "").toLowerCase();
+        if (s === "posted") return `投稿済`;
+        if (s === "failed") return `失敗`;
+        return `予約`;
+      }
+
+      function statusBadgeClass(status) {
+        const s = String(status || "").toLowerCase();
+        if (s === "posted") return "posted";
+        if (s === "failed") return "failed";
+        return "scheduled";
+      }
+
+      function postDayKey(scheduledAt) {
+        // scheduled_at is ISO; derive local calendar day
+        const dt = new Date(scheduledAt);
+        if (Number.isNaN(dt.getTime())) return "";
+        return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+      }
+
+      function timeLabel(scheduledAt) {
+        const dt = new Date(scheduledAt);
+        if (Number.isNaN(dt.getTime())) return "—";
+        return `${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`;
+      }
+
+      async function apiGet() {
+        const res = await fetch("/api/queue", { method: "GET" });
+        const text = await res.text();
+        if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
+        return JSON.parse(text);
+      }
+
+      async function apiPut(payload) {
+        const res = await fetch("/api/queue", {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const text = await res.text();
+        if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
+        return JSON.parse(text);
+      }
+
+      function uid() {
+        return `p_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+      }
+
+      function markDirty(v) {
+        dirty = v;
+        $("btnSave").disabled = !dirty;
+      }
+
+      async function reload() {
+        setError("");
+        $("btnReload").disabled = true;
+        try {
+          state = await apiGet();
+          dirty = false;
+          markDirty(false);
+          await render();
+        } catch (e) {
+          setError(String(e && e.message ? e.message : e));
+        } finally {
+          $("btnReload").disabled = false;
+        }
+      }
+
+      async function save() {
+        setError("");
+        $("btnSave").disabled = true;
+        try {
+          const saved = await apiPut(state);
+          state = saved;
+          dirty = false;
+          markDirty(false);
+          await render();
+        } catch (e) {
+          markDirty(true);
+          setError(String(e && e.message ? e.message : e));
+        }
+      }
+
+      function bindCard(card, globalIdx) {
+        const sched = card.querySelector(".in-sched");
+        const st = card.querySelector(".in-status");
+        const tx = card.querySelector(".in-text");
+        const timeEl = card.querySelector(".time");
+        const badgeEl = card.querySelector("[data-role='badge']");
+
+        const syncDerived = () => {
+          const p = state.posts[globalIdx];
+          timeEl.textContent = timeLabel(p.scheduled_at);
+          badgeEl.textContent = statusBadge(p.status);
+          badgeEl.className = `badge ${statusBadgeClass(p.status)}`;
+        };
+
+        sched.addEventListener("input", () => {
+          state.posts[globalIdx].scheduled_at = sched.value;
+          markDirty(true);
+          syncDerived();
+        });
+        st.addEventListener("input", () => {
+          state.posts[globalIdx].status = st.value;
+          markDirty(true);
+          syncDerived();
+        });
+        tx.addEventListener("input", () => {
+          state.posts[globalIdx].text = tx.value;
+          markDirty(true);
+        });
+      }
+
+      async function render() {
+        $("dayLabel").textContent = `${localDateLabel(day)} · LOCAL`;
+        const list = $("list");
+        if (!state) {
+          list.innerHTML = `<div class="card">読み込み中…</div>`;
+          return;
+        }
+
+        const posts = (state.posts || []).filter((p) => postDayKey(p.scheduled_at) === day);
+        posts.sort((a, b) => String(a.scheduled_at).localeCompare(String(b.scheduled_at)));
+
+        if (posts.length === 0) {
+          list.innerHTML = `<div class="card"><div class="hint">この日の予約はありません。右下の「＋」で追加できます。</div></div>`;
+          return;
+        }
+
+        list.innerHTML = posts
+          .map((p, idx) => {
+            const globalIdx = state.posts.indexOf(p);
+            return `
+            <div class="card" data-idx="${globalIdx}">
+              <div class="row">
+                <div class="time">${timeLabel(p.scheduled_at)}</div>
+                <span class="badge scheduled" data-role="badge"></span>
+              </div>
+              <div class="meta">
+                <div>
+                  <label>scheduled_at（タイムゾーン付きISO推奨）</label>
+                  <input class="in-sched" value="${String(p.scheduled_at || "")}" />
+                </div>
+                <div>
+                  <label>status</label>
+                  <input class="in-status" value="${String(p.status || "")}" />
+                </div>
+                <div style="grid-column: 1 / -1">
+                  <label>text（500字以内）</label>
+                  <textarea class="in-text">${String(p.text || "")}</textarea>
+                </div>
+              </div>
+            </div>`;
+          })
+          .join("");
+
+        list.querySelectorAll(".card").forEach((card) => {
+          const globalIdx = parseInt(card.getAttribute("data-idx"), 10);
+          const wrap = card.querySelector("[data-role='badge']");
+          wrap.textContent = statusBadge(state.posts[globalIdx].status);
+          wrap.className = `badge ${statusBadgeClass(state.posts[globalIdx].status)}`;
+          bindCard(card, globalIdx);
+        });
+      }
+
+      $("btnReload").addEventListener("click", () => reload());
+      $("btnSave").addEventListener("click", () => save());
+      $("btnPrev").addEventListener("click", () => bumpDay(-1));
+      $("btnNext").addEventListener("click", () => bumpDay(1));
+      $("btnToday").addEventListener("click", () => {
+        day = new Date().toISOString().slice(0, 10);
+        void render();
+      });
+
+      $("btnAdd").addEventListener("click", () => {
+        if (!state) return;
+        const now = new Date();
+        // default: selected local day at now's clock time (user edits ISO anyway)
+        const [y, m, d] = day.split("-").map((x) => parseInt(x, 10));
+        const dt = new Date(y, m - 1, d, now.getHours(), now.getMinutes(), 0);
+        const iso = dt.toISOString(); // NOTE: local->ISO; user should edit to +09:00 style if needed
+        state.posts.push({
+          id: uid(),
+          scheduled_at: iso,
+          status: "pending",
+          text: "",
+          attempts: 0,
+          threads_post_id: null,
+          last_error: null,
+          posted_at: null,
+          updated_at: null,
+        });
+        markDirty(true);
+        void render();
+      });
+
+      window.addEventListener("beforeunload", (e) => {
+        if (!dirty) return;
+        e.preventDefault();
+        e.returnValue = "";
+      });
+
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/sw.js").catch(() => {});
+      }
+
+      bumpDay(0);
+      reload();
+    </script>
+  </body>
+</html>

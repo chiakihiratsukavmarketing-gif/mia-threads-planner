@@ -1,0 +1,54 @@
+name: threads-queue
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    # NOTE: GitHub Actions の schedule は数分ズレることがあります
+    - cron: "*/5 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: threads-queue
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Verify secrets are present (no values printed)
+        shell: bash
+        env:
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${THREADS_USER_ID}" ]; then echo "Missing secret: THREADS_USER_ID" >&2; exit 2; fi
+          if [ -z "${THREADS_ACCESS_TOKEN}" ]; then echo "Missing secret: THREADS_ACCESS_TOKEN" >&2; exit 2; fi
+
+      - name: Run queue runner
+        env:
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          QUEUE_TOLERANCE_MINUTES: "5"
+          QUEUE_OVERDUE_EXTRA_MINUTES: "10"
+          QUEUE_MAX_POSTS_PER_DAY: "3"
+          QUEUE_MAX_ATTEMPTS: "8"
+        run: |
+          python scripts/gh_queue_runner.py --queue queue/posts.json
