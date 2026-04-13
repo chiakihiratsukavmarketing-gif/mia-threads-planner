@@ -13,7 +13,7 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.panel import Panel
-from rich.prompt import Confirm, Prompt
+from rich.prompt import Prompt
 
 from mei_threads.paths import config_dir, data_dir, env_path
 from mei_threads.agents.generator import generate_post
@@ -21,6 +21,38 @@ from mei_threads.agents.poster import ThreadsPoster
 
 
 console = Console()
+
+def _ask_choice(prompt: str, options: list[str], default: str) -> str:
+    opts = [o.lower() for o in options]
+    default = default.lower()
+    hint = "/".join(options)
+    while True:
+        raw = input(f"{prompt} [{hint}] ({default}): ").strip().lower()
+        if raw == "":
+            return default
+        if raw.isdigit():
+            i = int(raw) - 1
+            if 0 <= i < len(opts):
+                return opts[i]
+        if raw in opts:
+            return raw
+        matches = [o for o in opts if o.startswith(raw)]
+        if len(matches) == 1:
+            return matches[0]
+        console.print(f"[yellow]入力が不正です。{hint}（または 1..{len(opts)}）で入力してください。[/yellow]")
+
+
+def _confirm(prompt: str, default: bool = False) -> bool:
+    d = "y" if default else "n"
+    while True:
+        raw = input(f"{prompt} [y/n] ({d}): ").strip().lower()
+        if raw == "":
+            return default
+        if raw in ("y", "yes"):
+            return True
+        if raw in ("n", "no"):
+            return False
+        console.print("[yellow]y か n を入力してください。[/yellow]")
 
 
 ENV_TEMPLATE = """# Threads API
@@ -84,7 +116,7 @@ def cmd_compose(args: argparse.Namespace) -> None:
         console.print(Panel(text, title="投稿文（確認してください）", border_style="cyan"))
         console.print(f"[dim]文字数: {len(text)}字[/dim]")
 
-        choice = Prompt.ask("どうしますか？", choices=["post", "edit", "regen", "quit"], default="post")
+        choice = _ask_choice("どうしますか？", ["post", "edit", "regen", "quit"], default="post")
         if choice == "quit":
             return
         if choice == "regen":
@@ -102,7 +134,7 @@ def cmd_compose(args: argparse.Namespace) -> None:
             continue
 
         # post
-        if not args.yes and not Confirm.ask("この内容で投稿しますか？"):
+        if not args.yes and not _confirm("この内容で投稿しますか？", default=False):
             continue
 
         console.print(f"{dry_run_label}投稿中...")

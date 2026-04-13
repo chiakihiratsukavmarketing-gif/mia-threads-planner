@@ -25,6 +25,8 @@
 - `GITHUB_REPO`（例: `ai-sns-team`）
 - `GITHUB_BRANCH`（例: `main`）
 - `QUEUE_PATH`（デフォルト運用なら `queue/posts.json`）
+- `ANTHROPIC_API_KEY`（生成機能を使う場合）
+- `ANTHROPIC_MODEL`（任意。未設定なら `claude-opus-4-6`）
 
 ### 3) Cloudflare Access（A案）
 PagesのURL（またはカスタムドメイン）に対して **Accessポリシー**を設定し、  

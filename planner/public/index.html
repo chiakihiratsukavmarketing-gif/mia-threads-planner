@@ -208,6 +208,43 @@
       <div class="hint">
         予約の実行は GitHub Actions（±5分＋遅延救済）側です。ここは <code>queue/posts.json</code> の編集UIです。
       </div>
+      <div class="card" id="composer">
+        <div class="row">
+          <div style="font-weight: 800">生成（テーマ/型/メモ）</div>
+          <div class="hint">生成→確認→「下書きに追加」で予約に入れられます</div>
+        </div>
+        <div class="meta">
+          <div>
+            <label>テーマ</label>
+            <input id="cmpTopic" placeholder="例: 育児と仕事の両立" />
+          </div>
+          <div>
+            <label>投稿の型</label>
+            <input id="cmpType" list="postTypes" placeholder="例: 逆説型" />
+            <datalist id="postTypes">
+              <option value="暴露型"></option>
+              <option value="数字型"></option>
+              <option value="逆説型"></option>
+              <option value="共感型"></option>
+              <option value="実績型"></option>
+              <option value="スレッド型"></option>
+            </datalist>
+          </div>
+          <div style="grid-column: 1 / -1">
+            <label>方向性メモ（任意）</label>
+            <input id="cmpMemo" placeholder="例: 初期の段階でドカンと大きな利益を得る…" />
+          </div>
+          <div style="grid-column: 1 / -1">
+            <label>生成された文章（編集OK）</label>
+            <textarea id="cmpOut" placeholder="ここに生成結果が入ります"></textarea>
+            <div class="hint" id="cmpCount"></div>
+          </div>
+          <div class="row" style="grid-column: 1 / -1; justify-content: flex-end">
+            <button class="btn" id="btnGen" type="button">生成</button>
+            <button class="btn primary" id="btnAddDraft" type="button">下書きに追加（pending）</button>
+          </div>
+        </div>
+      </div>
       <div id="errorBox" style="display: none; margin-top: 12px"></div>
       <div id="list"></div>
     </main>
@@ -291,6 +328,17 @@
       async function apiPut(payload) {
         const res = await fetch("/api/queue", {
           method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const text = await res.text();
+        if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
+        return JSON.parse(text);
+      }
+
+      async function apiGenerate(payload) {
+        const res = await fetch("/api/generate", {
+          method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify(payload),
         });
@@ -427,6 +475,64 @@
       $("btnToday").addEventListener("click", () => {
         day = new Date().toISOString().slice(0, 10);
         void render();
+      });
+
+      function updateComposerCount() {
+        const out = $("cmpOut").value || "";
+        $("cmpCount").textContent = `文字数: ${out.length} / 500`;
+      }
+
+      $("cmpOut").addEventListener("input", updateComposerCount);
+
+      $("btnGen").addEventListener("click", async () => {
+        try {
+          setError("");
+          $("btnGen").disabled = true;
+          const topic = ($("cmpTopic").value || "").trim();
+          const post_type = ($("cmpType").value || "").trim();
+          const memo = ($("cmpMemo").value || "").trim();
+          if (!topic) throw new Error("テーマが空です");
+          if (!post_type) throw new Error("投稿の型が空です（例: 逆説型）");
+          const res = await apiGenerate({ topic, post_type, memo });
+          $("cmpOut").value = String(res.text || "");
+          updateComposerCount();
+        } catch (e) {
+          setError(String(e && e.message ? e.message : e));
+        } finally {
+          $("btnGen").disabled = false;
+        }
+      });
+
+      $("btnAddDraft").addEventListener("click", () => {
+        try {
+          setError("");
+          if (!state) throw new Error("まだ読み込み中です");
+          const text = ($("cmpOut").value || "").trim();
+          if (!text) throw new Error("生成された文章が空です");
+          if (text.length > 500) throw new Error("文章が500字を超えています");
+
+          const now = new Date();
+          const [y, m, d] = day.split("-").map((x) => parseInt(x, 10));
+          const dt = new Date(y, m - 1, d, now.getHours(), now.getMinutes(), 0);
+          const iso = dt.toISOString();
+
+          state.posts.push({
+            id: uid(),
+            scheduled_at: iso,
+            status: "pending",
+            text,
+            attempts: 0,
+            threads_post_id: null,
+            last_error: null,
+            posted_at: null,
+            updated_at: null,
+          });
+
+          markDirty(true);
+          void render();
+        } catch (e) {
+          setError(String(e && e.message ? e.message : e));
+        }
       });
 
       $("btnAdd").addEventListener("click", () => {
