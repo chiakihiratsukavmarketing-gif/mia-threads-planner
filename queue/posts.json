@@ -1,4 +1,16 @@
 {
   "version": 1,
-  "posts": []
+  "posts": [
+    {
+      "id": "p_1776060017922_fe2ee3a8b9367",
+      "scheduled_at": "2026-04-13T06:00:00.000Z",
+      "status": "pending",
+      "text": "テスト",
+      "attempts": 0,
+      "threads_post_id": null,
+      "last_error": null,
+      "posted_at": null,
+      "updated_at": null
+    }
+  ]
 }
