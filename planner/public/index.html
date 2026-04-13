@@ -314,7 +314,11 @@
       /** @type {"create"|"drafts"|"scheduled"|"done"} */
       let viewMode = "create";
       /** @type {string} YYYY-MM-DD (local) */
-      let day = new Date().toISOString().slice(0, 10);
+      function localYmdNow() {
+        const dt = new Date();
+        return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+      }
+      let day = localYmdNow();
 
       function setError(msg) {
         const box = $("errorBox");
@@ -679,7 +683,7 @@
       $("btnPrev").addEventListener("click", () => bumpDay(-1));
       $("btnNext").addEventListener("click", () => bumpDay(1));
       $("btnToday").addEventListener("click", () => {
-        day = new Date().toISOString().slice(0, 10);
+        day = localYmdNow();
         void render();
       });
       function setActiveTab() {
