@@ -42,6 +42,11 @@ jobs:
           if [ -z "${THREADS_USER_ID}" ]; then echo "Missing secret: THREADS_USER_ID" >&2; exit 2; fi
           if [ -z "${THREADS_ACCESS_TOKEN}" ]; then echo "Missing secret: THREADS_ACCESS_TOKEN" >&2; exit 2; fi
 
+      - name: Configure git author for commits
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
       - name: Run queue runner
         env:
           THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
