@@ -508,8 +508,24 @@
           syncDerived();
         });
         tx.addEventListener("input", () => {
-          state.posts[globalIdx].text = tx.value;
+          const p = state.posts[globalIdx];
+          p.text = tx.value;
+          if (Array.isArray(p.thread) && p.thread.length > 0) {
+            p.thread[0] = tx.value;
+          }
           markDirty(true);
+        });
+
+        card.querySelectorAll(".in-thread").forEach((el) => {
+          el.addEventListener("input", () => {
+            const p = state.posts[globalIdx];
+            const idx = parseInt(el.getAttribute("data-tidx"), 10);
+            if (!Array.isArray(p.thread)) {
+              p.thread = [String(p.text || ""), ""];
+            }
+            p.thread[idx] = el.value;
+            markDirty(true);
+          });
         });
 
         if (delBtn) {
@@ -611,6 +627,24 @@
                   <label>text（500字以内）</label>
                   <textarea class="in-text">${String(p.text || "")}</textarea>
                 </div>
+                ${
+                  Array.isArray(p.thread) && p.thread.length > 1
+                    ? `
+                <div style="grid-column: 1 / -1">
+                  <label>ツリー（2投稿目以降）</label>
+                  <div class="hint">各パートは500字以内。投稿時は順番に返信として送られます。</div>
+                  ${p.thread
+                    .slice(1)
+                    .map(
+                      (t, i) =>
+                        `<textarea class="in-thread" data-tidx="${i + 1}" placeholder="${i + 2}投稿目">${String(
+                          t || "",
+                        )}</textarea>`,
+                    )
+                    .join("")}
+                </div>`
+                    : ""
+                }
               </div>
             </div>`;
           })
