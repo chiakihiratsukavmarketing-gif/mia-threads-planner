@@ -350,6 +350,7 @@
       function statusBadge(status) {
         const s = String(status || "").toLowerCase();
         if (s === "posted") return `投稿済`;
+        if (s === "posting") return `配信中`;
         if (s === "failed") return `失敗`;
         return `予約`;
       }
@@ -357,6 +358,7 @@
       function statusBadgeClass(status) {
         const s = String(status || "").toLowerCase();
         if (s === "posted") return "posted";
+        if (s === "posting") return "scheduled";
         if (s === "failed") return "failed";
         return "scheduled";
       }
@@ -469,7 +471,18 @@
         const [y, m, d] = String(dateStr).split("-").map((x) => parseInt(x, 10));
         const [hh, mm] = String(timeStr).split(":").map((x) => parseInt(x, 10));
         const dt = new Date(y, m - 1, d, hh || 0, mm || 0, 0);
-        return dt.toISOString();
+        // Store with local offset (e.g. +09:00) to avoid confusion
+        const offMin = -dt.getTimezoneOffset();
+        const sign = offMin >= 0 ? "+" : "-";
+        const abs = Math.abs(offMin);
+        const oh = pad2(Math.floor(abs / 60));
+        const om = pad2(abs % 60);
+        const yyyy = dt.getFullYear();
+        const mo = pad2(dt.getMonth() + 1);
+        const da = pad2(dt.getDate());
+        const ho = pad2(dt.getHours());
+        const mi = pad2(dt.getMinutes());
+        return `${yyyy}-${mo}-${da}T${ho}:${mi}:00${sign}${oh}:${om}`;
       }
 
       function bindCard(card, globalIdx) {
@@ -553,9 +566,10 @@
 
         const all = state.posts || [];
         const countDrafts = all.filter((p) => String(p.status || "").toLowerCase() === "draft").length;
-        const countScheduled = all.filter(
-          (p) => String(p.status || "").toLowerCase() === "pending" && postDayKey(p.scheduled_at) === day,
-        ).length;
+        const countScheduled = all.filter((p) => {
+          const st = String(p.status || "").toLowerCase();
+          return (st === "pending" || st === "posting" || st === "failed") && postDayKey(p.scheduled_at) === day;
+        }).length;
         const countDone = all.filter(
           (p) => String(p.status || "").toLowerCase() === "posted" && postDayKey(p.scheduled_at) === day,
         ).length;
@@ -568,9 +582,10 @@
         if (viewMode === "drafts") {
           posts = posts.filter((p) => String(p.status || "").toLowerCase() === "draft");
         } else if (viewMode === "scheduled") {
-          posts = posts.filter(
-            (p) => String(p.status || "").toLowerCase() === "pending" && postDayKey(p.scheduled_at) === day,
-          );
+          posts = posts.filter((p) => {
+            const st = String(p.status || "").toLowerCase();
+            return (st === "pending" || st === "posting" || st === "failed") && postDayKey(p.scheduled_at) === day;
+          });
           posts.sort((a, b) => String(a.scheduled_at).localeCompare(String(b.scheduled_at)));
         } else if (viewMode === "done") {
           posts = posts.filter(
@@ -620,7 +635,7 @@
                 <div>
                   <label>status</label>
                   <select class="in-status">
-                    ${["draft","pending","posted","failed"].map(s=>`<option value="${s}" ${String(p.status||"").toLowerCase()===s?"selected":""}>${s}</option>`).join("")}
+                    ${["draft","pending","posting","posted","failed"].map(s=>`<option value="${s}" ${String(p.status||"").toLowerCase()===s?"selected":""}>${s}</option>`).join("")}
                   </select>
                 </div>
                 <div style="grid-column: 1 / -1">
