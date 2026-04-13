@@ -3,8 +3,8 @@
   "posts": [
     {
       "id": "p_1776060017922_fe2ee3a8b9367",
-      "scheduled_at": "2026-04-13T06:00:00.000Z",
-      "status": "pending",
+      "scheduled_at": "2026-04-13T11:05:00.000Z",
+      "status": "draft",
       "text": "テスト",
       "attempts": 0,
       "threads_post_id": null,
