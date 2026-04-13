@@ -72,11 +72,11 @@ class ThreadsTextPoster:
     def __init__(self, cfg: ThreadsConfig):
         self.cfg = cfg
 
-    def post(self, text: str) -> tuple[bool, str | None, str | None]:
+    def post(self, text: str, reply_to_id: str | None = None) -> tuple[bool, str | None, str | None]:
         if len(text) > MAX_TEXT_LENGTH:
             return False, None, f"文字数超過: {len(text)}字（上限{MAX_TEXT_LENGTH}字）"
 
-        container_id = self._create_container(text)
+        container_id = self._create_container(text, reply_to_id=reply_to_id)
         if not container_id:
             return False, None, "コンテナ作成失敗"
 
@@ -88,9 +88,11 @@ class ThreadsTextPoster:
 
         return True, post_id, None
 
-    def _create_container(self, text: str) -> str | None:
+    def _create_container(self, text: str, reply_to_id: str | None = None) -> str | None:
         url = f"{THREADS_API_BASE}/{self.cfg.user_id}/threads"
         params = {"media_type": "TEXT", "text": text, "access_token": self.cfg.access_token}
+        if reply_to_id:
+            params["reply_to_id"] = reply_to_id
         resp = requests.post(url, params=params, timeout=30)
         if resp.ok:
             payload = _safe_json(resp)
@@ -245,17 +247,46 @@ def main() -> int:
             continue
 
         assert poster is not None
-        ok, threads_post_id, err = poster.post(text)
-        if ok and threads_post_id:
-            p["status"] = "posted"
-            p["threads_post_id"] = threads_post_id
-            p["posted_at"] = now.isoformat()
-            p["last_error"] = None
-            posted_today += 1
+        thread_parts = p.get("thread")
+        if isinstance(thread_parts, list) and thread_parts:
+            # thread[0] を先頭として扱う（UI側で同じ文を入れていてもOK）
+            parts = [text] + [str(x) for x in thread_parts[1:]]
+            reply_to: str | None = None
+            ok_all = True
+            last_post_id: str | None = None
+            last_err: str | None = None
+            for i, part in enumerate(parts):
+                ok_i, post_id_i, err_i = poster.post(part, reply_to_id=reply_to)
+                if not ok_i or not post_id_i:
+                    ok_all = False
+                    last_err = err_i or "unknown_error"
+                    break
+                last_post_id = post_id_i
+                reply_to = post_id_i
+                # 連投は少し待つ（API処理待ち）
+                time.sleep(3)
+
+            if ok_all and last_post_id:
+                p["status"] = "posted"
+                p["threads_post_id"] = last_post_id
+                p["posted_at"] = now.isoformat()
+                p["last_error"] = None
+                posted_today += 1
+            else:
+                p["status"] = "pending"
+                p["last_error"] = last_err or "unknown_error"
         else:
-            # 次の周期で再試行できるように pending に戻す（ただし attempts で上限）
-            p["status"] = "pending"
-            p["last_error"] = err or "unknown_error"
+            ok, threads_post_id, err = poster.post(text)
+            if ok and threads_post_id:
+                p["status"] = "posted"
+                p["threads_post_id"] = threads_post_id
+                p["posted_at"] = now.isoformat()
+                p["last_error"] = None
+                posted_today += 1
+            else:
+                # 次の周期で再試行できるように pending に戻す（ただし attempts で上限）
+                p["status"] = "pending"
+                p["last_error"] = err or "unknown_error"
 
         p["updated_at"] = _utc_now().isoformat()
         changed = True

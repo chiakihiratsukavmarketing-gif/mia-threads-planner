@@ -132,6 +132,13 @@ function validateQueue(data: any) {
     if (typeof p.text !== "string") throw new Error(`Invalid queue: text must be string (${p.id})`);
     if (p.text.length > 500) throw new Error(`Invalid queue: text too long (${p.id})`);
     if (p.status && typeof p.status !== "string") throw new Error(`Invalid queue: status must be string (${p.id})`);
+    if (p.thread != null) {
+      if (!Array.isArray(p.thread)) throw new Error(`Invalid queue: thread must be array|null (${p.id})`);
+      for (const t of p.thread) {
+        if (typeof t !== "string") throw new Error(`Invalid queue: thread part must be string (${p.id})`);
+        if (t.length > 500) throw new Error(`Invalid queue: thread part too long (${p.id})`);
+      }
+    }
   }
 }
 

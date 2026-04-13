@@ -78,6 +78,7 @@ type GenerateRequest = {
   topic: string;
   post_type: string;
   memo?: string;
+  thread?: boolean;
 };
 
 export const onRequest: PagesFunction<Env> = async (ctx) => {
@@ -95,7 +96,23 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
     if (!topic) return json({ error: "topic_required" }, { status: 400 });
     if (!postType) return json({ error: "post_type_required" }, { status: 400 });
 
-    const user = `以下のテーマで投稿文を生成してください。
+    const wantThread = Boolean((body as any).thread);
+    const user = wantThread
+      ? `以下のテーマで「ツリー投稿」を生成してください。
+
+【テーマ】${topic}
+【投稿の型】${postType}
+${memo ? "【方向性メモ】" + memo : ""}
+
+出力は必ず次のJSONだけ（説明不要）:
+{"parts":["1投稿目","2投稿目","3投稿目"]}
+
+ルール:
+- partsは2〜6個
+- 各要素は500字以内
+- 1投稿目の末尾は（1/3）などの表記を付けてもOK
+`
+      : `以下のテーマで投稿文を生成してください。
 
 【テーマ】${topic}
 【投稿の型】${postType}
@@ -129,7 +146,21 @@ ${memo ? "【方向性メモ】" + memo : ""}`;
       return json({ error: "anthropic_response_unexpected" }, { status: 500 });
     }
 
-    return json({ text: out.trim() });
+    const trimmed = out.trim();
+    if (wantThread) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        const parts = parsed?.parts;
+        if (!Array.isArray(parts) || parts.length < 2) throw new Error("parts_invalid");
+        const cleaned = parts.map((p: any) => String(p || "").trim()).filter((s: string) => s.length > 0);
+        if (cleaned.length < 2) throw new Error("parts_empty");
+        return json({ parts: cleaned });
+      } catch {
+        return json({ error: "thread_json_parse_failed", detail: trimmed.slice(0, 1000) }, { status: 500 });
+      }
+    }
+
+    return json({ text: trimmed });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return json({ error: msg }, { status: 500 });

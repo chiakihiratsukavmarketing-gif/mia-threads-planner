@@ -180,6 +180,15 @@
         padding: 10px;
         font-size: 14px;
       }
+      select {
+        width: 100%;
+        box-sizing: border-box;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        padding: 10px;
+        font-size: 14px;
+        background: #fff;
+      }
       .fab {
         position: fixed;
         right: 16px;
@@ -260,6 +269,10 @@
             <label>生成された文章（編集OK）</label>
             <textarea id="cmpOut" placeholder="ここに生成結果が入ります"></textarea>
             <div class="hint" id="cmpCount"></div>
+          </div>
+          <div style="grid-column: 1 / -1">
+            <label><input type="checkbox" id="cmpThread" /> ツリー投稿として生成（複数投稿）</label>
+            <div class="hint">ONにすると、生成結果は複数投稿になり「下書き」へまとめて追加されます</div>
           </div>
           <div class="row" style="grid-column: 1 / -1; justify-content: flex-end">
             <button class="btn" id="btnGen" type="button">生成</button>
@@ -469,7 +482,7 @@
           schedDate.addEventListener("input", apply);
           schedTime.addEventListener("input", apply);
         }
-        st.addEventListener("input", () => {
+        st.addEventListener("change", () => {
           state.posts[globalIdx].status = st.value;
           markDirty(true);
           syncDerived();
@@ -526,8 +539,10 @@
                   <input class="in-time" type="time" step="300" value="${parts.time}" />
                 </div>
                 <div>
-                  <label>status（draft/pending/posted/failed）</label>
-                  <input class="in-status" value="${String(p.status || "")}" />
+                  <label>status</label>
+                  <select class="in-status">
+                    ${["draft","pending","posted","failed"].map(s=>`<option value="${s}" ${String(p.status||"").toLowerCase()===s?"selected":""}>${s}</option>`).join("")}
+                  </select>
                 </div>
                 <div style="grid-column: 1 / -1">
                   <label>text（500字以内）</label>
@@ -582,10 +597,15 @@
           const topic = ($("cmpTopic").value || "").trim();
           const post_type = ($("cmpType").value || "").trim();
           const memo = ($("cmpMemo").value || "").trim();
+          const thread = Boolean($("cmpThread").checked);
           if (!topic) throw new Error("テーマが空です");
           if (!post_type) throw new Error("投稿の型が空です（例: 逆説型）");
-          const res = await apiGenerate({ topic, post_type, memo });
-          $("cmpOut").value = String(res.text || "");
+          const res = await apiGenerate({ topic, post_type, memo, thread });
+          if (thread) {
+            $("cmpOut").value = Array.isArray(res.parts) ? res.parts.join("\n\n---\n\n") : "";
+          } else {
+            $("cmpOut").value = String(res.text || "");
+          }
           updateComposerCount();
         } catch (e) {
           setError(String(e && e.message ? e.message : e));
@@ -600,13 +620,16 @@
           if (!state) throw new Error("まだ読み込み中です");
           const text = ($("cmpOut").value || "").trim();
           if (!text) throw new Error("生成された文章が空です");
-          if (text.length > 500) throw new Error("文章が500字を超えています");
+          const thread = Boolean($("cmpThread").checked);
+          const parts = thread ? text.split(/\n\s*---\s*\n/).map((s) => s.trim()).filter(Boolean) : [text];
+          if (parts.some((p) => p.length > 500)) throw new Error("500字を超える投稿が含まれています");
 
           state.posts.push({
             id: uid(),
             scheduled_at: null,
             status: "draft",
-            text,
+            text: parts[0],
+            thread: parts.length > 1 ? parts : null,
             attempts: 0,
             threads_post_id: null,
             last_error: null,
