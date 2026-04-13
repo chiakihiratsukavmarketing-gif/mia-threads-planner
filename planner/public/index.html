@@ -117,6 +117,23 @@
         align-items: center;
         justify-content: space-between;
       }
+      .row.left {
+        justify-content: flex-start;
+      }
+      .iconbtn {
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--text);
+        padding: 8px 10px;
+        border-radius: 10px;
+        font-weight: 800;
+        cursor: pointer;
+      }
+      .iconbtn.danger {
+        border-color: #fecaca;
+        background: #fff;
+        color: #991b1b;
+      }
       .badge {
         font-size: 12px;
         font-weight: 800;
@@ -460,6 +477,7 @@
         const tx = card.querySelector(".in-text");
         const timeEl = card.querySelector(".time");
         const badgeEl = card.querySelector("[data-role='badge']");
+        const delBtn = card.querySelector(".btn-del");
 
         const syncDerived = () => {
           const p = state.posts[globalIdx];
@@ -491,6 +509,17 @@
           state.posts[globalIdx].text = tx.value;
           markDirty(true);
         });
+
+        if (delBtn) {
+          delBtn.addEventListener("click", () => {
+            if (!state) return;
+            const ok = window.confirm("この投稿を削除しますか？（元に戻せません）");
+            if (!ok) return;
+            state.posts.splice(globalIdx, 1);
+            markDirty(true);
+            void render();
+          });
+        }
       }
 
       async function render() {
@@ -526,8 +555,11 @@
             return `
             <div class="card" data-idx="${globalIdx}">
               <div class="row">
-                <div class="time">${String(p.status || "").toLowerCase() === "draft" ? "下書き" : timeLabel(p.scheduled_at)}</div>
-                <span class="badge scheduled" data-role="badge"></span>
+                <div class="row left" style="gap: 12px; align-items: center;">
+                  <div class="time">${String(p.status || "").toLowerCase() === "draft" ? "下書き" : timeLabel(p.scheduled_at)}</div>
+                  <span class="badge scheduled" data-role="badge"></span>
+                </div>
+                <button class="iconbtn danger btn-del" type="button">削除</button>
               </div>
               <div class="meta">
                 <div>
