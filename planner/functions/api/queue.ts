@@ -118,7 +118,17 @@ function validateQueue(data: any) {
   for (const p of data.posts) {
     if (!p || typeof p !== "object") throw new Error("Invalid queue: post must be object");
     if (!p.id || typeof p.id !== "string") throw new Error("Invalid queue: post.id required");
-    if (!p.scheduled_at || typeof p.scheduled_at !== "string") throw new Error(`Invalid queue: scheduled_at required (${p.id})`);
+    const status = String(p.status || "").toLowerCase();
+    // 下書きは scheduled_at を未設定でもOK（予約にするときに入れる）
+    if (status !== "draft") {
+      if (!p.scheduled_at || typeof p.scheduled_at !== "string") {
+        throw new Error(`Invalid queue: scheduled_at required (${p.id})`);
+      }
+    } else {
+      if (p.scheduled_at != null && typeof p.scheduled_at !== "string") {
+        throw new Error(`Invalid queue: scheduled_at must be string|null (${p.id})`);
+      }
+    }
     if (typeof p.text !== "string") throw new Error(`Invalid queue: text must be string (${p.id})`);
     if (p.text.length > 500) throw new Error(`Invalid queue: text too long (${p.id})`);
     if (p.status && typeof p.status !== "string") throw new Error(`Invalid queue: status must be string (${p.id})`);

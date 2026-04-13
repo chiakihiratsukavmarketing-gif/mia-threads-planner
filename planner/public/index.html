@@ -58,6 +58,27 @@
         justify-content: space-between;
         margin: 12px 0 14px;
       }
+      .tabs {
+        display: inline-flex;
+        gap: 8px;
+        padding: 4px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #fff;
+      }
+      .tab {
+        border: none;
+        background: transparent;
+        padding: 10px 12px;
+        border-radius: 10px;
+        font-weight: 800;
+        cursor: pointer;
+        color: var(--muted);
+      }
+      .tab.active {
+        background: #111827;
+        color: #fff;
+      }
       .btn {
         border: 1px solid var(--line);
         background: #fff;
@@ -197,6 +218,10 @@
     <main>
       <div class="toolbar">
         <div>
+          <div class="tabs" role="tablist" aria-label="views">
+            <button class="tab active" id="tabScheduled" type="button">予約済み</button>
+            <button class="tab" id="tabDrafts" type="button">下書き</button>
+          </div>
           <button class="btn" id="btnPrev" type="button">←</button>
           <button class="btn" id="btnNext" type="button">→</button>
         </div>
@@ -204,9 +229,6 @@
           <button class="btn" id="btnReload" type="button">再読込</button>
           <button class="btn primary" id="btnSave" type="button" disabled>保存（GitHubへcommit）</button>
         </div>
-      </div>
-      <div class="hint">
-        予約の実行は GitHub Actions（±5分＋遅延救済）側です。ここは <code>queue/posts.json</code> の編集UIです。
       </div>
       <div class="card" id="composer">
         <div class="row">
@@ -257,6 +279,8 @@
       /** @type {{version:number, posts:any[]} | null} */
       let state = null;
       let dirty = false;
+      /** @type {"scheduled"|"drafts"} */
+      let viewMode = "scheduled";
       /** @type {string} YYYY-MM-DD (local) */
       let day = new Date().toISOString().slice(0, 10);
 
@@ -351,6 +375,19 @@
         return `p_${Date.now()}_${Math.random().toString(16).slice(2)}`;
       }
 
+      function setBusy(btn, busy, busyLabel) {
+        if (!btn) return;
+        if (!btn.dataset) btn.dataset = {};
+        if (busy) {
+          btn.dataset.origText = btn.textContent || "";
+          btn.textContent = busyLabel;
+          btn.disabled = true;
+        } else {
+          btn.textContent = btn.dataset.origText || btn.textContent;
+          btn.disabled = false;
+        }
+      }
+
       function markDirty(v) {
         dirty = v;
         $("btnSave").disabled = !dirty;
@@ -358,7 +395,7 @@
 
       async function reload() {
         setError("");
-        $("btnReload").disabled = true;
+        setBusy($("btnReload"), true, "更新中…");
         try {
           state = await apiGet();
           dirty = false;
@@ -367,13 +404,13 @@
         } catch (e) {
           setError(String(e && e.message ? e.message : e));
         } finally {
-          $("btnReload").disabled = false;
+          setBusy($("btnReload"), false, "");
         }
       }
 
       async function save() {
         setError("");
-        $("btnSave").disabled = true;
+        setBusy($("btnSave"), true, "保存中…");
         try {
           const saved = await apiPut(state);
           state = saved;
@@ -383,11 +420,29 @@
         } catch (e) {
           markDirty(true);
           setError(String(e && e.message ? e.message : e));
+        } finally {
+          setBusy($("btnSave"), false, "");
         }
       }
 
+      function getLocalParts(iso) {
+        const dt = iso ? new Date(iso) : null;
+        if (!dt || Number.isNaN(dt.getTime())) return { date: day, time: "12:00" };
+        const d = `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+        const t = `${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`;
+        return { date: d, time: t };
+      }
+
+      function toIsoFromLocal(dateStr, timeStr) {
+        const [y, m, d] = String(dateStr).split("-").map((x) => parseInt(x, 10));
+        const [hh, mm] = String(timeStr).split(":").map((x) => parseInt(x, 10));
+        const dt = new Date(y, m - 1, d, hh || 0, mm || 0, 0);
+        return dt.toISOString();
+      }
+
       function bindCard(card, globalIdx) {
-        const sched = card.querySelector(".in-sched");
+        const schedDate = card.querySelector(".in-date");
+        const schedTime = card.querySelector(".in-time");
         const st = card.querySelector(".in-status");
         const tx = card.querySelector(".in-text");
         const timeEl = card.querySelector(".time");
@@ -395,16 +450,25 @@
 
         const syncDerived = () => {
           const p = state.posts[globalIdx];
-          timeEl.textContent = timeLabel(p.scheduled_at);
+          if (String(p.status || "").toLowerCase() === "draft") {
+            timeEl.textContent = "下書き";
+          } else {
+            timeEl.textContent = timeLabel(p.scheduled_at);
+          }
           badgeEl.textContent = statusBadge(p.status);
           badgeEl.className = `badge ${statusBadgeClass(p.status)}`;
         };
 
-        sched.addEventListener("input", () => {
-          state.posts[globalIdx].scheduled_at = sched.value;
-          markDirty(true);
-          syncDerived();
-        });
+        if (schedDate && schedTime) {
+          const apply = () => {
+            const p = state.posts[globalIdx];
+            p.scheduled_at = toIsoFromLocal(schedDate.value, schedTime.value);
+            markDirty(true);
+            syncDerived();
+          };
+          schedDate.addEventListener("input", apply);
+          schedTime.addEventListener("input", apply);
+        }
         st.addEventListener("input", () => {
           state.posts[globalIdx].status = st.value;
           markDirty(true);
@@ -424,30 +488,45 @@
           return;
         }
 
-        const posts = (state.posts || []).filter((p) => postDayKey(p.scheduled_at) === day);
-        posts.sort((a, b) => String(a.scheduled_at).localeCompare(String(b.scheduled_at)));
+        let posts = state.posts || [];
+        if (viewMode === "drafts") {
+          posts = posts.filter((p) => String(p.status || "").toLowerCase() === "draft");
+        } else {
+          posts = posts.filter(
+            (p) => String(p.status || "").toLowerCase() === "pending" && postDayKey(p.scheduled_at) === day,
+          );
+          posts.sort((a, b) => String(a.scheduled_at).localeCompare(String(b.scheduled_at)));
+        }
 
         if (posts.length === 0) {
-          list.innerHTML = `<div class="card"><div class="hint">この日の予約はありません。右下の「＋」で追加できます。</div></div>`;
+          list.innerHTML =
+            viewMode === "drafts"
+              ? `<div class="card"><div class="hint">下書きはありません。上の「生成」から追加できます。</div></div>`
+              : `<div class="card"><div class="hint">この日の予約はありません。右下の「＋」で追加できます。</div></div>`;
           return;
         }
 
         list.innerHTML = posts
           .map((p, idx) => {
             const globalIdx = state.posts.indexOf(p);
+            const parts = getLocalParts(p.scheduled_at);
             return `
             <div class="card" data-idx="${globalIdx}">
               <div class="row">
-                <div class="time">${timeLabel(p.scheduled_at)}</div>
+                <div class="time">${String(p.status || "").toLowerCase() === "draft" ? "下書き" : timeLabel(p.scheduled_at)}</div>
                 <span class="badge scheduled" data-role="badge"></span>
               </div>
               <div class="meta">
                 <div>
-                  <label>scheduled_at（タイムゾーン付きISO推奨）</label>
-                  <input class="in-sched" value="${String(p.scheduled_at || "")}" />
+                  <label>日付（カレンダー）</label>
+                  <input class="in-date" type="date" value="${parts.date}" />
                 </div>
                 <div>
-                  <label>status</label>
+                  <label>時刻（5分刻み）</label>
+                  <input class="in-time" type="time" step="300" value="${parts.time}" />
+                </div>
+                <div>
+                  <label>status（draft/pending/posted/failed）</label>
                   <input class="in-status" value="${String(p.status || "")}" />
                 </div>
                 <div style="grid-column: 1 / -1">
@@ -476,6 +555,18 @@
         day = new Date().toISOString().slice(0, 10);
         void render();
       });
+      $("tabScheduled").addEventListener("click", () => {
+        viewMode = "scheduled";
+        $("tabScheduled").classList.add("active");
+        $("tabDrafts").classList.remove("active");
+        void render();
+      });
+      $("tabDrafts").addEventListener("click", () => {
+        viewMode = "drafts";
+        $("tabDrafts").classList.add("active");
+        $("tabScheduled").classList.remove("active");
+        void render();
+      });
 
       function updateComposerCount() {
         const out = $("cmpOut").value || "";
@@ -487,7 +578,7 @@
       $("btnGen").addEventListener("click", async () => {
         try {
           setError("");
-          $("btnGen").disabled = true;
+          setBusy($("btnGen"), true, "生成中…");
           const topic = ($("cmpTopic").value || "").trim();
           const post_type = ($("cmpType").value || "").trim();
           const memo = ($("cmpMemo").value || "").trim();
@@ -499,7 +590,7 @@
         } catch (e) {
           setError(String(e && e.message ? e.message : e));
         } finally {
-          $("btnGen").disabled = false;
+          setBusy($("btnGen"), false, "");
         }
       });
 
@@ -511,15 +602,10 @@
           if (!text) throw new Error("生成された文章が空です");
           if (text.length > 500) throw new Error("文章が500字を超えています");
 
-          const now = new Date();
-          const [y, m, d] = day.split("-").map((x) => parseInt(x, 10));
-          const dt = new Date(y, m - 1, d, now.getHours(), now.getMinutes(), 0);
-          const iso = dt.toISOString();
-
           state.posts.push({
             id: uid(),
-            scheduled_at: iso,
-            status: "pending",
+            scheduled_at: null,
+            status: "draft",
             text,
             attempts: 0,
             threads_post_id: null,
