@@ -1,5 +1,5 @@
 /* Minimal offline shell: cache the app shell only */
-const CACHE = "threads-planner-v5";
+const CACHE = "threads-planner-v6";
 const ASSETS = ["/", "/index.html", "/manifest.json"];
 
 self.addEventListener("install", (event) => {

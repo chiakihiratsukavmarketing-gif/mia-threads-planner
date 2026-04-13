@@ -245,8 +245,10 @@
       <div class="toolbar">
         <div>
           <div class="tabs" role="tablist" aria-label="views">
-            <button class="tab active" id="tabScheduled" type="button">予約済み</button>
+            <button class="tab active" id="tabCreate" type="button">新規作成</button>
             <button class="tab" id="tabDrafts" type="button">下書き</button>
+            <button class="tab" id="tabScheduled" type="button">予約済み</button>
+            <button class="tab" id="tabDone" type="button">配信完了</button>
           </div>
           <button class="btn" id="btnPrev" type="button">←</button>
           <button class="btn" id="btnNext" type="button">→</button>
@@ -309,8 +311,8 @@
       /** @type {{version:number, posts:any[]} | null} */
       let state = null;
       let dirty = false;
-      /** @type {"scheduled"|"drafts"} */
-      let viewMode = "scheduled";
+      /** @type {"create"|"drafts"|"scheduled"|"done"} */
+      let viewMode = "create";
       /** @type {string} YYYY-MM-DD (local) */
       let day = new Date().toISOString().slice(0, 10);
 
@@ -530,20 +532,49 @@
           return;
         }
 
-        let posts = state.posts || [];
+        // show composer only on "create"
+        $("composer").style.display = viewMode === "create" ? "block" : "none";
+
+        const all = state.posts || [];
+        const countDrafts = all.filter((p) => String(p.status || "").toLowerCase() === "draft").length;
+        const countScheduled = all.filter(
+          (p) => String(p.status || "").toLowerCase() === "pending" && postDayKey(p.scheduled_at) === day,
+        ).length;
+        const countDone = all.filter(
+          (p) => String(p.status || "").toLowerCase() === "posted" && postDayKey(p.scheduled_at) === day,
+        ).length;
+
+        $("tabDrafts").textContent = `下書き${countDrafts ? " (" + countDrafts + ")" : ""}`;
+        $("tabScheduled").textContent = `予約済み${countScheduled ? " (" + countScheduled + ")" : ""}`;
+        $("tabDone").textContent = `配信完了${countDone ? " (" + countDone + ")" : ""}`;
+
+        let posts = all;
         if (viewMode === "drafts") {
           posts = posts.filter((p) => String(p.status || "").toLowerCase() === "draft");
-        } else {
+        } else if (viewMode === "scheduled") {
           posts = posts.filter(
             (p) => String(p.status || "").toLowerCase() === "pending" && postDayKey(p.scheduled_at) === day,
           );
           posts.sort((a, b) => String(a.scheduled_at).localeCompare(String(b.scheduled_at)));
+        } else if (viewMode === "done") {
+          posts = posts.filter(
+            (p) => String(p.status || "").toLowerCase() === "posted" && postDayKey(p.scheduled_at) === day,
+          );
+          posts.sort((a, b) => String(a.scheduled_at).localeCompare(String(b.scheduled_at)));
+        } else {
+          // create tab: show nothing in list area (composer only)
+          posts = [];
         }
 
         if (posts.length === 0) {
-          list.innerHTML =
-            viewMode === "drafts"
-              ? `<div class="card"><div class="hint">下書きはありません。上の「生成」から追加できます。</div></div>`
+          if (viewMode === "create") {
+            list.innerHTML = "";
+            return;
+          }
+          list.innerHTML = viewMode === "drafts"
+            ? `<div class="card"><div class="hint">下書きはありません。「新規作成」タブから追加できます。</div></div>`
+            : viewMode === "done"
+              ? `<div class="card"><div class="hint">この日の配信完了はありません。</div></div>`
               : `<div class="card"><div class="hint">この日の予約はありません。右下の「＋」で追加できます。</div></div>`;
           return;
         }
@@ -602,16 +633,33 @@
         day = new Date().toISOString().slice(0, 10);
         void render();
       });
-      $("tabScheduled").addEventListener("click", () => {
-        viewMode = "scheduled";
-        $("tabScheduled").classList.add("active");
-        $("tabDrafts").classList.remove("active");
+      function setActiveTab() {
+        for (const id of ["tabCreate","tabDrafts","tabScheduled","tabDone"]) {
+          $(id).classList.remove("active");
+        }
+        if (viewMode === "create") $("tabCreate").classList.add("active");
+        if (viewMode === "drafts") $("tabDrafts").classList.add("active");
+        if (viewMode === "scheduled") $("tabScheduled").classList.add("active");
+        if (viewMode === "done") $("tabDone").classList.add("active");
+      }
+      $("tabCreate").addEventListener("click", () => {
+        viewMode = "create";
+        setActiveTab();
         void render();
       });
       $("tabDrafts").addEventListener("click", () => {
         viewMode = "drafts";
-        $("tabDrafts").classList.add("active");
-        $("tabScheduled").classList.remove("active");
+        setActiveTab();
+        void render();
+      });
+      $("tabScheduled").addEventListener("click", () => {
+        viewMode = "scheduled";
+        setActiveTab();
+        void render();
+      });
+      $("tabDone").addEventListener("click", () => {
+        viewMode = "done";
+        setActiveTab();
         void render();
       });
 
