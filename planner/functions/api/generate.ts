@@ -104,13 +104,20 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
 【投稿の型】${postType}
 ${memo ? "【方向性メモ】" + memo : ""}
 
-出力は必ず次のJSONだけ（説明不要）:
-{"parts":["1投稿目","2投稿目","3投稿目"]}
+出力ルール:
+- 投稿は2〜6個
+- 各投稿は500字以内
+- **各投稿の区切り**は、必ず次の形式で入れてください（前後に余計な説明を入れない）:
 
-ルール:
-- partsは2〜6個
-- 各要素は500字以内
-- 1投稿目の末尾は（1/3）などの表記を付けてもOK
+---
+
+- 例:
+1投稿目
+
+---
+
+2投稿目
+（必要なら 1投稿目の末尾に (1/3) のような表記を付けてOK）
 `
       : `以下のテーマで投稿文を生成してください。
 
@@ -148,16 +155,14 @@ ${memo ? "【方向性メモ】" + memo : ""}`;
 
     const trimmed = out.trim();
     if (wantThread) {
-      try {
-        const parsed = JSON.parse(trimmed);
-        const parts = parsed?.parts;
-        if (!Array.isArray(parts) || parts.length < 2) throw new Error("parts_invalid");
-        const cleaned = parts.map((p: any) => String(p || "").trim()).filter((s: string) => s.length > 0);
-        if (cleaned.length < 2) throw new Error("parts_empty");
-        return json({ parts: cleaned });
-      } catch {
-        return json({ error: "thread_json_parse_failed", detail: trimmed.slice(0, 1000) }, { status: 500 });
+      const parts = trimmed
+        .split(/\n\s*---\s*\n/g)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      if (parts.length < 2) {
+        return json({ error: "thread_split_failed", detail: trimmed.slice(0, 1000) }, { status: 500 });
       }
+      return json({ parts });
     }
 
     return json({ text: trimmed });
