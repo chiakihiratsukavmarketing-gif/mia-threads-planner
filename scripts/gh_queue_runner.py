@@ -61,8 +61,8 @@ def _debug_pending(posts: list[dict[str, Any]], *, now: datetime, tolerance: tim
         sa = str(p.get("scheduled_at", "")).strip()
         try:
             sched = _parse_dt(sa)
-            start = sched - tolerance - overdue_extra
-            end = sched + tolerance
+            start = sched - tolerance
+            end = sched + tolerance + overdue_extra
             delta_min = (now - sched).total_seconds() / 60.0
             line = (
                 f"- {pid} sched={_fmt_dt(sched)} "
@@ -185,8 +185,10 @@ def _pick_due_posts(
         except Exception:
             continue
 
-        start = sched - tolerance - overdue_extra
-        end = sched + tolerance
+        # Accept a small early/late window (tolerance), plus a late "overdue rescue"
+        # window for scheduler delays.
+        start = sched - tolerance
+        end = sched + tolerance + overdue_extra
         if start <= now <= end:
             due.append(p)
 
