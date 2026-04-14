@@ -44,6 +44,40 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _fmt_dt(dt: datetime) -> str:
+    jst = dt.astimezone(ZoneInfo("Asia/Tokyo"))
+    return f"{dt.isoformat()} (JST {jst.strftime('%Y-%m-%d %H:%M:%S %z')})"
+
+
+def _debug_pending(posts: list[dict[str, Any]], *, now: datetime, tolerance: timedelta, overdue_extra: timedelta) -> None:
+    pending = [p for p in posts if p.get("status") == "pending" and p.get("scheduled_at")]
+    print(f"now: {_fmt_dt(now)}")
+    print(f"tolerance: {tolerance} / overdue_extra: {overdue_extra}")
+    print(f"pending(with scheduled_at): {len(pending)}")
+
+    items: list[tuple[float, str]] = []
+    for p in pending:
+        pid = str(p.get("id", "")).strip()
+        sa = str(p.get("scheduled_at", "")).strip()
+        try:
+            sched = _parse_dt(sa)
+            start = sched - tolerance - overdue_extra
+            end = sched + tolerance
+            delta_min = (now - sched).total_seconds() / 60.0
+            line = (
+                f"- {pid} sched={_fmt_dt(sched)} "
+                f"window=[{_fmt_dt(start)} .. {_fmt_dt(end)}] "
+                f"delta_min={delta_min:+.1f}"
+            )
+            items.append((abs(delta_min), line))
+        except Exception as e:
+            items.append((999999.0, f"- {pid} sched_parse_failed scheduled_at={sa!r} err={e}"))
+
+    items.sort(key=lambda x: x[0])
+    for _, line in items[:8]:
+        print(line)
+
+
 def _git(*args: str) -> None:
     subprocess.check_call(["git", *args])
 
@@ -180,6 +214,7 @@ def main() -> int:
     tolerance = timedelta(minutes=tolerance_min)
     overdue_extra = timedelta(minutes=overdue_extra_min)
     now = _utc_now()
+    print(f"runner_start: {_fmt_dt(now)}")
 
     raw = json.loads(queue_path.read_text(encoding="utf-8"))
     posts: list[dict[str, Any]] = list(raw.get("posts", []))
@@ -189,8 +224,33 @@ def main() -> int:
         print(f"skip: daily cap reached ({posted_today}/{max_per_day})")
         return 0
 
+    # Validate scheduled_at on pending posts; don't silently skip parse errors.
+    any_invalid = False
+    for p in posts:
+        if p.get("status") != "pending":
+            continue
+        sa = p.get("scheduled_at")
+        if not sa:
+            continue
+        try:
+            _parse_dt(str(sa))
+        except Exception as e:
+            p["status"] = "failed"
+            p["last_error"] = f"scheduled_at parse failed: {e}"
+            p["updated_at"] = now.isoformat()
+            any_invalid = True
+
+    if any_invalid:
+        raw["posts"] = posts
+        queue_path.write_text(json.dumps(raw, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        if os.environ.get("GITHUB_ACTIONS") == "true" and not args.no_push:
+            msg = f"chore(queue): mark invalid scheduled_at ({now.isoformat()})"
+            committed = _git_commit_if_needed(msg)
+            print("committed+push" if committed else "no git changes (unexpected)")
+
     due = _pick_due_posts(posts, now=now, tolerance=tolerance, overdue_extra=overdue_extra)
     if not due:
+        _debug_pending(posts, now=now, tolerance=tolerance, overdue_extra=overdue_extra)
         print("no due posts")
         return 0
 
