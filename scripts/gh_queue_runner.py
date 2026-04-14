@@ -29,7 +29,12 @@ MAX_TEXT_LENGTH = 500
 
 def _parse_dt(value: str) -> datetime:
     # Python 3.11+: fromisoformat supports offsets like +09:00
-    dt = datetime.fromisoformat(value)
+    # Planner UI may still contain a legacy "Z" suffix (UTC). Python's fromisoformat
+    # does not accept "Z", so normalize it to +00:00.
+    v = value.strip()
+    if v.endswith("Z"):
+        v = v[:-1] + "+00:00"
+    dt = datetime.fromisoformat(v)
     if dt.tzinfo is None:
         raise ValueError(f"timezoneなしの日時は不可: {value}")
     return dt.astimezone(timezone.utc)

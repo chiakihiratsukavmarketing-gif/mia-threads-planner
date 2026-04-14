@@ -472,7 +472,14 @@
         setError("");
         setBusy($("btnSave"), true, "保存中…");
         try {
-          const saved = await apiPut(state);
+          // Normalize legacy Zulu timestamps so the runner can parse them.
+          const payload = JSON.parse(JSON.stringify(state || { version: 1, posts: [] }));
+          for (const p of payload.posts || []) {
+            if (p && typeof p.scheduled_at === "string" && p.scheduled_at.endsWith("Z")) {
+              p.scheduled_at = p.scheduled_at.replace(/Z$/, "+00:00");
+            }
+          }
+          const saved = await apiPut(payload);
           state = saved;
           dirty = false;
           markDirty(false);
@@ -801,9 +808,9 @@
         if (!state) return;
         const now = new Date();
         // default: selected local day at now's clock time (user edits ISO anyway)
-        const [y, m, d] = day.split("-").map((x) => parseInt(x, 10));
-        const dt = new Date(y, m - 1, d, now.getHours(), now.getMinutes(), 0);
-        const iso = dt.toISOString(); // NOTE: local->ISO; user should edit to +09:00 style if needed
+        const hh = pad2(now.getHours());
+        const mm = pad2(Math.floor(now.getMinutes() / 5) * 5); // keep 5-min step
+        const iso = toIsoFromLocal(day, `${hh}:${mm}`);
         state.posts.push({
           id: uid(),
           scheduled_at: iso,
