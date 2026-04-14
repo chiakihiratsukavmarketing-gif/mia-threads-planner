@@ -156,6 +156,9 @@
         border-color: #fecaca;
         background: #fef2f2;
       }
+      .badge.hidden {
+        display: none;
+      }
       .time {
         font-weight: 800;
         font-variant-numeric: tabular-nums;
@@ -255,13 +258,13 @@
         </div>
         <div style="display: flex; gap: 10px; align-items: center">
           <button class="btn" id="btnReload" type="button">再読込</button>
-          <button class="btn primary" id="btnSave" type="button" disabled>保存（GitHubへcommit）</button>
+          <button class="btn primary" id="btnSave" type="button" disabled>保存</button>
         </div>
       </div>
       <div class="card" id="composer">
         <div class="row">
           <div style="font-weight: 800">生成（テーマ/型/メモ）</div>
-          <div class="hint">生成→確認→「下書きに追加」で予約に入れられます</div>
+          <div class="hint">生成→確認→「下書きに追加」で下書きに入れます</div>
         </div>
         <div class="meta">
           <div>
@@ -295,7 +298,7 @@
           </div>
           <div class="row" style="grid-column: 1 / -1; justify-content: flex-end">
             <button class="btn" id="btnGen" type="button">生成</button>
-            <button class="btn primary" id="btnAddDraft" type="button">下書きに追加（pending）</button>
+            <button class="btn primary" id="btnAddDraft" type="button">下書きに追加</button>
           </div>
         </div>
       </div>
@@ -367,6 +370,18 @@
         return "scheduled";
       }
 
+      function applyBadgeEl(badgeEl, post) {
+        if (!badgeEl || !post) return;
+        const st = String(post.status || "").toLowerCase();
+        if (st === "draft" || dirty) {
+          badgeEl.textContent = "";
+          badgeEl.className = "badge hidden";
+          return;
+        }
+        badgeEl.textContent = statusBadge(post.status);
+        badgeEl.className = `badge ${statusBadgeClass(post.status)}`;
+      }
+
       function postDayKey(scheduledAt) {
         // scheduled_at is ISO; derive local calendar day
         const dt = new Date(scheduledAt);
@@ -429,6 +444,13 @@
       function markDirty(v) {
         dirty = v;
         $("btnSave").disabled = !dirty;
+        document.querySelectorAll(".card[data-idx]").forEach((card) => {
+          const globalIdx = parseInt(card.getAttribute("data-idx"), 10);
+          const badgeEl = card.querySelector("[data-role='badge']");
+          const p = state && state.posts ? state.posts[globalIdx] : null;
+          if (!p) return;
+          applyBadgeEl(badgeEl, p);
+        });
       }
 
       async function reload() {
@@ -505,8 +527,7 @@
           } else {
             timeEl.textContent = timeLabel(p.scheduled_at);
           }
-          badgeEl.textContent = statusBadge(p.status);
-          badgeEl.className = `badge ${statusBadgeClass(p.status)}`;
+          applyBadgeEl(badgeEl, p);
         };
 
         if (schedDate && schedTime) {
@@ -672,8 +693,7 @@
         list.querySelectorAll(".card").forEach((card) => {
           const globalIdx = parseInt(card.getAttribute("data-idx"), 10);
           const wrap = card.querySelector("[data-role='badge']");
-          wrap.textContent = statusBadge(state.posts[globalIdx].status);
-          wrap.className = `badge ${statusBadgeClass(state.posts[globalIdx].status)}`;
+          applyBadgeEl(wrap, state.posts[globalIdx]);
           bindCard(card, globalIdx);
         });
       }

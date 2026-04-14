@@ -21,6 +21,14 @@ function requireEnv(env: Env) {
   if (missing.length) throw new Error(`Missing Cloudflare env vars: ${missing.join(", ")}`);
 }
 
+function stripProgressMarkers(text: string) {
+  // Remove "(1/4)" / "（2/4）" style markers anywhere in the output.
+  return String(text || "")
+    .replace(/\(\s*\d+\s*\/\s*\d+\s*\)/g, "")
+    .replace(/（\s*\d+\s*\/\s*\d+\s*）/g, "")
+    .replace(/\[\s*\d+\s*\/\s*\d+\s*\]/g, "");
+}
+
 const SYSTEM_PROMPT = `あなたは「みあ」というSNSアカウントの投稿文を生成するライターです。
 以下のルールに従って、みあとして自然な投稿文を書いてください。
 
@@ -53,6 +61,7 @@ const SYSTEM_PROMPT = `あなたは「みあ」というSNSアカウントの投
 ### 逆説型（土曜夜推奨）
 - 冒頭でターゲットの悩みをそのまま代弁
 - 「知識量の問題じゃない、〇〇の問題」という構造
+- 冒頭の型（短くてよい）：引きのある一文 → 一般論っぽい一言 → 否定（「意志が弱いとかそういう話じゃない」系）
 
 ### 共感型（金曜推奨）
 - 体験談で共感 → AIを使い始めた理由・変化を正直に
@@ -63,7 +72,7 @@ const SYSTEM_PROMPT = `あなたは「みあ」というSNSアカウントの投
 - 「劇的ではないが確か」なリアリティが信頼を生む
 
 ### スレッド型（土曜夜推奨）
-- 「全部話します（1/4）」形式。寸止めでスレッドへ誘導
+- 寸止めでスレッドへ誘導（**(1/4)** のような連番・ページ数表記は使わない）
 
 ## 絶対NG表現（金融規制・炎上・ポジション崩壊）
 【金融規制系・絶対使わない】
@@ -96,6 +105,15 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
     if (!topic) return json({ error: "topic_required" }, { status: 400 });
     if (!postType) return json({ error: "post_type_required" }, { status: 400 });
 
+    const paradoxExtra =
+      postType.includes("逆説") || postType.toLowerCase().includes("paradox")
+        ? `
+
+追加（逆説型のみ）:
+- 冒頭は短くてよい。次の流れを意識する：引きのある冒頭 → 一般論 → 否定（「意志が弱い」とか人格攻撃にならない否定）
+- 例のニュアンス（コピペ禁止）: 冒頭で違和感のある事実/観察 → 身近なパターンの一般論 → 「本人の意志が弱い話じゃない」方向の否定`
+        : "";
+
     const wantThread = Boolean((body as any).thread);
     const user = wantThread
       ? `以下のテーマで「ツリー投稿」を生成してください。
@@ -103,10 +121,12 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
 【テーマ】${topic}
 【投稿の型】${postType}
 ${memo ? "【方向性メモ】" + memo : ""}
+${paradoxExtra}
 
 出力ルール:
 - 投稿は2〜6個
 - 各投稿は500字以内
+- **(1/3)** や **(2/4)** のような連番・ページ数表記は一切入れない
 - **各投稿の区切り**は、必ず次の形式で入れてください（前後に余計な説明を入れない）:
 
 ---
@@ -117,13 +137,13 @@ ${memo ? "【方向性メモ】" + memo : ""}
 ---
 
 2投稿目
-（必要なら 1投稿目の末尾に (1/3) のような表記を付けてOK）
 `
       : `以下のテーマで投稿文を生成してください。
 
 【テーマ】${topic}
 【投稿の型】${postType}
-${memo ? "【方向性メモ】" + memo : ""}`;
+${memo ? "【方向性メモ】" + memo : ""}
+${paradoxExtra}`;
 
     const model = (ctx.env.ANTHROPIC_MODEL && String(ctx.env.ANTHROPIC_MODEL).trim()) || "claude-opus-4-6";
 
@@ -153,11 +173,11 @@ ${memo ? "【方向性メモ】" + memo : ""}`;
       return json({ error: "anthropic_response_unexpected" }, { status: 500 });
     }
 
-    const trimmed = out.trim();
+    const trimmed = stripProgressMarkers(out.trim());
     if (wantThread) {
       const parts = trimmed
         .split(/\n\s*---\s*\n/g)
-        .map((s) => s.trim())
+        .map((s) => stripProgressMarkers(s).trim())
         .filter((s) => s.length > 0);
       if (parts.length < 2) {
         return json({ error: "thread_split_failed", detail: trimmed.slice(0, 1000) }, { status: 500 });
