@@ -52,7 +52,8 @@ jobs:
           THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
           THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
           QUEUE_TOLERANCE_MINUTES: "5"
-          QUEUE_OVERDUE_EXTRA_MINUTES: "10"
+          # GitHub Actions の schedule は遅延/取りこぼしがあり得るので、救済窓を広めに取る
+          QUEUE_OVERDUE_EXTRA_MINUTES: "60"
           QUEUE_MAX_POSTS_PER_DAY: "3"
           QUEUE_MAX_ATTEMPTS: "8"
         run: |
