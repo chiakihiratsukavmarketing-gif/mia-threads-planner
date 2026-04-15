@@ -53,8 +53,9 @@ jobs:
           THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
           # 予約の少し前に手動実行しても拾えるように前倒し許容を広げる
           QUEUE_TOLERANCE_MINUTES: "15"
-          # 遅延救済（遅れて回った分を拾う）。過剰に広げると意図しない投稿が走るので最小に。
-          QUEUE_OVERDUE_EXTRA_MINUTES: "5"
+          # 遅延救済（遅れて回った分を拾う）。
+          # GitHub Actions の schedule は混雑で 10〜20分遅れることがあり、7:30起動などで 7:00枠を取り逃す事故が出たため少し広げる。
+          QUEUE_OVERDUE_EXTRA_MINUTES: "20"
           QUEUE_MAX_POSTS_PER_DAY: "3"
           QUEUE_MAX_ATTEMPTS: "8"
         run: |

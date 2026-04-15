@@ -134,6 +134,11 @@
         background: #fff;
         color: #991b1b;
       }
+      .iconbtn.green {
+        border-color: #bbf7d0;
+        background: #f0fdf4;
+        color: #166534;
+      }
       .badge {
         font-size: 12px;
         font-weight: 800;
@@ -526,6 +531,7 @@
         const timeEl = card.querySelector(".time");
         const badgeEl = card.querySelector("[data-role='badge']");
         const delBtn = card.querySelector(".btn-del");
+        const postNowBtn = card.querySelector(".btn-post-now");
 
         const syncDerived = () => {
           const p = state.posts[globalIdx];
@@ -581,6 +587,52 @@
             state.posts.splice(globalIdx, 1);
             markDirty(true);
             void render();
+          });
+        }
+
+        if (postNowBtn) {
+          postNowBtn.addEventListener("click", async () => {
+            try {
+              setError("");
+              if (!state) throw new Error("まだ読み込み中です");
+              const p = state.posts[globalIdx];
+              const st0 = String(p.status || "").toLowerCase();
+              if (st0 !== "draft") throw new Error("下書きのみ即投稿できます");
+              const text = String(p.text || "").trim();
+              if (!text) throw new Error("text が空です");
+              if (text.length > 500) throw new Error("text が500字を超えています");
+
+              const ok = window.confirm("この下書きを今すぐ投稿しますか？\n（まずキューを保存→その後、投稿ワークフローを起動します）");
+              if (!ok) return;
+
+              // Convert draft -> pending now, and persist immediately.
+              const now = new Date();
+              const iso = toIsoFromLocal(
+                `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`,
+                `${pad2(now.getHours())}:${pad2(Math.floor(now.getMinutes() / 5) * 5)}`,
+              );
+              p.scheduled_at = iso;
+              p.status = "pending";
+              p.last_error = null;
+              markDirty(true);
+              syncDerived();
+              await save();
+
+              // Best-effort: trigger Actions immediately to avoid waiting for cron.
+              postNowBtn.disabled = true;
+              postNowBtn.textContent = "起動中…";
+              const res = await fetch("/api/dispatch", { method: "POST" });
+              const t = await res.text();
+              if (!res.ok) throw new Error(t || `dispatch HTTP ${res.status}`);
+              postNowBtn.textContent = "起動OK";
+              setTimeout(() => void reload(), 1200);
+            } catch (e) {
+              setError(String(e && e.message ? e.message : e));
+              try {
+                postNowBtn.disabled = false;
+                postNowBtn.textContent = "即投稿";
+              } catch {}
+            }
           });
         }
       }
@@ -646,6 +698,7 @@
           .map((p, idx) => {
             const globalIdx = state.posts.indexOf(p);
             const parts = getLocalParts(p.scheduled_at);
+            const isDraft = String(p.status || "").toLowerCase() === "draft";
             return `
             <div class="card" data-idx="${globalIdx}">
               <div class="row">
@@ -653,7 +706,10 @@
                   <div class="time">${String(p.status || "").toLowerCase() === "draft" ? "下書き" : timeLabel(p.scheduled_at)}</div>
                   <span class="badge scheduled" data-role="badge"></span>
                 </div>
-                <button class="iconbtn danger btn-del" type="button">削除</button>
+                <div class="row left" style="gap: 8px;">
+                  ${isDraft ? `<button class="iconbtn green btn-post-now" type="button">即投稿</button>` : ""}
+                  <button class="iconbtn danger btn-del" type="button">削除</button>
+                </div>
               </div>
               <div class="meta">
                 <div>
