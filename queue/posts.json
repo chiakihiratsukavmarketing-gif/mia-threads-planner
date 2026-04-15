@@ -87,14 +87,14 @@
     {
       "id": "p_1776229281063_112d933c7d901",
       "scheduled_at": "2026-04-15T14:00:00+09:00",
-      "status": "pending",
+      "status": "posted",
       "text": "テスト",
       "thread": null,
-      "attempts": 0,
-      "threads_post_id": null,
+      "attempts": 1,
+      "threads_post_id": "17922686127292953",
       "last_error": null,
-      "posted_at": null,
-      "updated_at": null
+      "posted_at": "2026-04-15T05:01:51.251178+00:00",
+      "updated_at": "2026-04-15T05:02:00.795840+00:00"
     }
   ]
 }
