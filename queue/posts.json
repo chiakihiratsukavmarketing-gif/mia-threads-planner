@@ -288,6 +288,18 @@
       "last_error": null,
       "posted_at": "2026-04-21T13:24:26.506747+00:00",
       "updated_at": "2026-04-21T13:25:24.487409+00:00"
+    },
+    {
+      "id": "p_1776829915598_18fc92878b9538",
+      "scheduled_at": "2026-04-22T12:50:00+09:00",
+      "status": "pending",
+      "text": "テスト",
+      "thread": null,
+      "attempts": 0,
+      "threads_post_id": null,
+      "last_error": null,
+      "posted_at": null,
+      "updated_at": null
     }
   ]
 }
