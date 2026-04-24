@@ -448,15 +448,15 @@
     },
     {
       "id": "p_1777041793913_879df7dea23e8",
-      "scheduled_at": "2026-04-24T23:40:00+09:00",
+      "scheduled_at": "2026-04-24T23:49:00+09:00",
       "status": "pending",
       "text": "テスト",
       "thread": null,
-      "attempts": 1,
+      "attempts": 0,
       "threads_post_id": null,
-      "last_error": "コンテナ作成失敗",
+      "last_error": null,
       "posted_at": null,
-      "updated_at": "2026-04-24T14:44:28.973Z"
+      "updated_at": null
     }
   ]
 }
