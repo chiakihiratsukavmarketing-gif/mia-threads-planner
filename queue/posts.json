@@ -433,6 +433,18 @@
       "last_error": "最大試行回数超過 (8)",
       "posted_at": null,
       "updated_at": "2026-04-23T12:39:28.996Z"
+    },
+    {
+      "id": "p_1777038341473_e950889a214e18",
+      "scheduled_at": "2026-04-24T22:51:00+09:00",
+      "status": "draft",
+      "text": "テスト",
+      "thread": null,
+      "attempts": 0,
+      "threads_post_id": null,
+      "last_error": null,
+      "posted_at": null,
+      "updated_at": null
     }
   ]
 }
