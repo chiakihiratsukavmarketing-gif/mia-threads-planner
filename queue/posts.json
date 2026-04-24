@@ -461,7 +461,7 @@
     {
       "id": "p_1777042517739_d6263316cc4",
       "scheduled_at": "2026-04-24T23:59:00+09:00",
-      "status": "draft",
+      "status": "pending",
       "text": "テスト",
       "thread": null,
       "attempts": 0,
