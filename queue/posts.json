@@ -486,6 +486,18 @@
       "last_error": null,
       "posted_at": "2026-04-25T13:05:33.989Z",
       "updated_at": "2026-04-25T13:06:28.818Z"
+    },
+    {
+      "id": "p_1777124823722_363d5c7a417128",
+      "scheduled_at": "2026-04-25T22:52:00+09:00",
+      "status": "pending",
+      "text": "テスト",
+      "thread": null,
+      "attempts": 0,
+      "threads_post_id": null,
+      "last_error": null,
+      "posted_at": null,
+      "updated_at": null
     }
   ]
 }
