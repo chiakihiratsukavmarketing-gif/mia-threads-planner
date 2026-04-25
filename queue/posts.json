@@ -490,14 +490,14 @@
     {
       "id": "p_1777124823722_363d5c7a417128",
       "scheduled_at": "2026-04-25T22:52:00+09:00",
-      "status": "pending",
+      "status": "posted",
       "text": "テスト",
       "thread": null,
       "attempts": 1,
-      "threads_post_id": null,
-      "last_error": "コンテナ作成失敗",
-      "posted_at": null,
-      "updated_at": "2026-04-25T13:54:29.212Z"
+      "threads_post_id": "18111102832870371",
+      "last_error": null,
+      "posted_at": "2026-04-25T13:55:34.228Z",
+      "updated_at": "2026-04-25T13:55:43.919Z"
     }
   ]
 }
